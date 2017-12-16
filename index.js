@@ -262,7 +262,11 @@ app.post('/api/create', (req, res) => {
 		console.log("Error: ", err);
 		return;
 	});
-})
+});
+
+app.post('/api/website/create', (req, res) => {
+	
+});
 
 app.get('/api/uuid', (req, res) => {
 	res.json(uuid());
@@ -270,10 +274,6 @@ app.get('/api/uuid', (req, res) => {
 
 app.get('/', (req, res) => {
 	res.sendFile(__dirname + "/public/main.html");
-});
-
-app.get('/something', (req, res) => {
-	res.send("Something has been sent");
 });
 
 app.listen(process.env.PORT || 5000);

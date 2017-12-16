@@ -23,10 +23,28 @@
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
+
 		<a href="/api/cookie">See Cookies</a>
 		<a href="/api/cookie/clear">Remove All Cookies</a>
 		<a href="/api/read">See User Data</a>
 		<a href="/api/clear/login">Clear logins</a>
 		<a href="/api/clear/all/user">Delete all user Accounts</a>
+
+		<form action="/api/website/create" method="post">
+			<fieldset>
+				<legend>Website Create</legend>
+				<label>Website URL: <input type="text" name="url" value="some.site.com"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Login" />
+			</fieldset>
+		</form>
+		<form action="/api/website/login" method="post">
+			<fieldset>
+				<legend>Website Login</legend>
+				<label>Website URL: <input type="text" name="url" value="some.site.com"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Login" />
+			</fieldset>
+		</form>
 	</body>
 </html>
