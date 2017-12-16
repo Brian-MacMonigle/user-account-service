@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+	<body>
+		<h1>
+			Brian's User Account Service
+		</h1>
+		<p>
+			Instructions to follow later.
+		</p>
+		<form action="/api/create" method="post">
+			<fieldset>
+				<legend>Create Account</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Create" />
+			</fieldset>
+		</form>
+		<form action="/api/login" method="post">
+			<fieldset>
+				<legend>Log In</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Login" />
+			</fieldset>
+		</form>
+		<a href="/api/cookie">See Cookies</a>
+		<a href="/api/cookie/clear">Remove All Cookies</a>
+		<a href="/api/read">See User Data</a>
+		<a href="/api/clear/login">Clear logins</a>
+		<a href="/api/clear/all/user">Delete all user Accounts</a>
+	</body>
+</html>
