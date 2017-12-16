@@ -273,7 +273,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/something', (req, res) => {
-	res.sned("Something has been sent");
+	res.send("Something has been sent");
 });
 
 app.listen(process.env.PORT || 5000);
