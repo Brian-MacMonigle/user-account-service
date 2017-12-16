@@ -272,4 +272,8 @@ app.get('/', (req, res) => {
 	res.sendFile(__dirname + "/public/main.html");
 });
 
+app.get('/something', (req, res) => {
+	res.sned("Something has been sent");
+});
+
 app.listen(process.env.PORT || 5000);
