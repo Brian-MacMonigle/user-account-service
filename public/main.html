@@ -7,6 +7,10 @@
 		<p>
 			Instructions to follow later.
 		</p>
+
+		<a href="/api/cookie">See Cookies</a>
+		<a href="/api/cookie/clear">Remove All Cookies</a>
+
 		<form action="/api/create" method="post">
 			<fieldset>
 				<legend>Create Account</legend>
@@ -24,27 +28,29 @@
 			</fieldset>
 		</form>
 
-		<a href="/api/cookie">See Cookies</a>
-		<a href="/api/cookie/clear">Remove All Cookies</a>
 		<a href="/api/read">See User Data</a>
-		<a href="/api/clear/login">Clear logins</a>
-		<a href="/api/clear/all/user">Delete all user Accounts</a>
+		<a href="/api/login/clear">Clear logins</a>
+		<a href="/api/user/clear/all">Delete all user Accounts</a>
 
-		<form action="/api/website/create" method="post">
+		<form action="/api/site/create" method="post">
 			<fieldset>
 				<legend>Website Create</legend>
-				<label>Website URL: <input type="text" name="url" value="some.site.com"/></label>
+				<label>Website URL: <input type="text" name="site" value="some.site.com"/></label>
 				<label>Password: <input type="password" name="pass" value="pass"/></label>
-				<input type="submit" value="Login" />
+				<input type="submit" value="Create" />
 			</fieldset>
 		</form>
-		<form action="/api/website/login" method="post">
+		<form action="/api/site/login" method="post">
 			<fieldset>
 				<legend>Website Login</legend>
-				<label>Website URL: <input type="text" name="url" value="some.site.com"/></label>
+				<label>Website URL: <input type="text" name="site" value="some.site.com"/></label>
 				<label>Password: <input type="password" name="pass" value="pass"/></label>
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
+
+		<a href="/api/site/read">See Site Data</a>
+		<a href="/api/site/login/clear">Clear Site logins</a>
+		<a href="/api/site/clear/all">Delete all Site Accounts</a>
 	</body>
 </html>
