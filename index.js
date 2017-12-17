@@ -22,9 +22,75 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+
+function siteToDatabase(site) {
+	let res = "";
+	for(let char of site) {
+		if(char === '.' || char === '/') {
+			res += '-';
+		} else {
+			res += char;
+		}
+	}
+	return res;
+}
+
+function saveIp(req, res, next) {
+	let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+	let date = new Date().toString();
+	let purpose = siteToDatabase(req.url);
+	database.ref('ip/').once('value')
+	.then(snap => snap.val())
+	.then(val => { 
+		let key = undefined;
+		if(val != null) {
+			Object.keys(val).forEach(k => {
+				if(val[k].ip === ip) {
+					key = k;
+				}
+			});
+		}
+		if(val === null || key === undefined) {
+			let json = {
+				'ip': ip
+			}
+			json[purpose] = {
+				'first': date,
+				'last': date,
+				'amount': 1
+			}
+			database.ref('ip/').push().set(json);
+		} else {
+			let json = val[key] || {'ip': ip};
+
+			if(json[purpose] === undefined) {
+				json[purpose] = {
+					'first': date,
+					'last': date,
+					'amount': 1
+				}
+			} else {
+				json[purpose] = {
+					'first': json[purpose].first || date,
+					'last': date,
+					'amount': ++json[purpose].amount || 1
+				}
+			}
+			database.ref('ip/' + key).set(json);
+		}
+	})
+	.catch(err => {
+		console.log("Error: " + err);
+	});
+	next();
+}
+
+app.use(saveIp);
+
 function hash(str) {
 	return crypto.createHash(hashAlg).update(str).digest('hex');
 }
+
 
 app.get('/api/cookie', (req, res) => {
 	res.json(req.cookies);
@@ -276,18 +342,6 @@ app.get('/api/login/clear', (req, res) => {
 	});
 });
 
-function siteToDatabase(site) {
-	let res = "";
-	for(let char of site) {
-		if(char === '.') {
-			res += '-';
-		} else {
-			res += char;
-		}
-	}
-	return res;
-}
-
 function createSiteLoginCookie(res, site) {
 	let id = uuid();
 
@@ -507,32 +561,6 @@ app.get('/api/uuid', (req, res) => {
 
 app.get('/', (req, res) => {
 	res.sendFile(__dirname + "/public/main.html");
-
-	let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-	let date = new Date();
-	database.ref('ip/').once('value')
-	.then(snap => snap.val())
-	.then(val => { 
-		let has = undefined;
-		if(val != null) {
-			Object.keys(val).forEach(key => {
-				if(val[key].ip === ip) {
-					has = key;
-				}
-			});
-		}
-		if(has === undefined) {
-			console.log("New ip: " + ip);
-			database.ref('ip/').push().set({
-				'ip': ip,
-				'first': date.toString(),
-				'last': date.toString()
-			});
-		} else {
-			database.ref('ip/' + has + '/last').set(date.toString());
-		}
-	})
-	.catch(err => console.log("Error: " + err));
 });
 
 app.listen(process.env.PORT || 5000);
