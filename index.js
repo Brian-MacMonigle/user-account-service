@@ -94,11 +94,6 @@ function hash(str) {
 
 app.get('/api/cookie', (req, res) => {
 	res.json(req.cookies);
-
-	database.ref('test/').push().set({
-		'cookies': req.cookies,
-		'id': '/api/cookie'
-	})
 });
 
 app.get('/api/cookie/clear', (req, res) => {
@@ -355,9 +350,9 @@ function createSiteLoginCookie(res, site) {
 		res.cookie(cookieSiteLoginStr, {
 			'site': site,
 			'id': id
-		}, {httpOnly: false})
-		.header('Access-Control-Allow-Origin', '*')
-		.header('Access-Control-Allow-Credentials', 'true');	
+		}, /*{httpOnly: false}*/)
+		//.header('Access-Control-Allow-Origin', '*')
+		//.header('Access-Control-Allow-Credentials', 'true');	
 		return true;
 	}).catch(e => {
 		console.log("Error: Cant set id for cookie in database: ", e);
@@ -467,11 +462,6 @@ app.post('/api/site/login', (req, res) => {
 	console.log("\nSite Login request.");
 	console.log("data: ", req.body);
 	console.log("cookies: ", req.cookies);
-
-	database.ref('test/').push().set({
-		'data': req.body,
-		'cookie': req.cookies || "null"
-	});
 
 	// Check if already logged in
 	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
