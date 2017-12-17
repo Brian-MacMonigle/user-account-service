@@ -92,7 +92,7 @@ function validLoginCookie(cookie) {
 	}
 	return database.ref('user/' + cookie.user).once('value')
 		.then(snap => {
-			if(snap == null) {
+			if(snap.val() == null) {
 				console.log("User doesn't exist.");
 				return Promise.reject("User doesn't exist.");
 			} else {
@@ -316,7 +316,7 @@ function validSiteLoginCookie(cookie) {
 	}
 	return database.ref('site/' + cookie.site).once('value')
 		.then(snap => {
-			if(snap === null) {
+			if(snap.val() === null) {
 				console.log("Site doesn't exist.");
 				return Promise.reject("Site doesn't exist.");
 			} else {
@@ -481,7 +481,6 @@ app.get('/api/site/read', (req, res) => {
 	});
 });
 
-// ERROR NOT ATCUALLY CLEARING!
 app.get('/api/site/login/clear', (req, res) => {
 	console.log("\nClear logins request.");
 	
@@ -501,7 +500,6 @@ app.get('/api/site/login/clear', (req, res) => {
 		console.log("Error:", e);
 	});
 });
-
 
 app.get('/api/uuid', (req, res) => {
 	res.json(uuid());
