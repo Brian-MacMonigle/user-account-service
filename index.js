@@ -350,7 +350,7 @@ function createSiteLoginCookie(res, site) {
 		res.cookie(cookieSiteLoginStr, {
 			'site': site,
 			'id': id
-		})
+		}, {httpOnly: false})
 		.header('Access-Control-Allow-Origin', '*')
 		.header('Access-Control-Allow-Credentials', 'true');	
 		return true;
