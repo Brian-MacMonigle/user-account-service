@@ -507,6 +507,32 @@ app.get('/api/uuid', (req, res) => {
 
 app.get('/', (req, res) => {
 	res.sendFile(__dirname + "/public/main.html");
+
+	let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+	let date = new Date();
+	database.ref('ip/').once('value')
+	.then(snap => snap.val())
+	.then(val => { 
+		let has = undefined;
+		if(val != null) {
+			Object.keys(val).forEach(key => {
+				if(val[key].ip === ip) {
+					has = key;
+				}
+			});
+		}
+		if(has === undefined) {
+			console.log("New ip: " + ip);
+			database.ref('ip/').push().set({
+				'ip': ip,
+				'first': date.toString(),
+				'last': date.toString()
+			});
+		} else {
+			database.ref('ip/' + has + '/last').set(date.toString());
+		}
+	})
+	.catch(err => console.log("Error: " + err));
 });
 
 app.listen(process.env.PORT || 5000);
