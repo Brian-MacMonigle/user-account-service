@@ -350,7 +350,9 @@ function createSiteLoginCookie(res, site) {
 		res.cookie(cookieSiteLoginStr, {
 			'site': site,
 			'id': id
-		});	
+		})
+		.header('Access-Control-Allow-Origin', '*')
+		.header('Access-Control-Allow-Credentials', 'true');	
 		return true;
 	}).catch(e => {
 		console.log("Error: Cant set id for cookie in database: ", e);
