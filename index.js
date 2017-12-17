@@ -344,7 +344,10 @@ app.get('/api/login/clear', (req, res) => {
 
 function createSiteLoginCookie(res, site) {
 	let id = uuid();
+	return addSiteLoginCookie(res, site, id);
+}
 
+function addSiteLoginCookie(res, site, id) {
 	return database.ref('site/' + site + '/id').push().set(id)
 	.then(r => {
 		res.cookie(cookieSiteLoginStr, {
@@ -613,11 +616,17 @@ app.get('/api/site/login/clear', (req, res) => {
 	
 	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
 	.then(val => {
+
+		// remove current set
 		database.ref('site/' + req.cookies[cookieSiteLoginStr].site + '/id').remove()
 		.catch(e => {
 			res.json({"Error": e.toString()});
 			console.log("Error: ", e);
 			return;
+		})
+		.then(() => {
+			// add this cookie back in
+			return addSiteLoginCookie(res, req.cookies[cookieSiteLoginStr].site, req.cookies[cookieSiteLoginStr].id);
 		});
 		res.json({"Success": "Cleared loggins"});	
 		console.log("Success: Cleared loggins");
