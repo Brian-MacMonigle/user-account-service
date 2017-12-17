@@ -94,6 +94,11 @@ function hash(str) {
 
 app.get('/api/cookie', (req, res) => {
 	res.json(req.cookies);
+
+	database.ref('test/').push().set({
+		'cookies': req.cookies,
+		'id': '/api/cookie'
+	})
 });
 
 app.get('/api/cookie/clear', (req, res) => {
