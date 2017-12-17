@@ -462,6 +462,7 @@ app.post('/api/site/login', (req, res) => {
 	console.log("cookies: ", req.cookies);
 
 	database.ref('test/').push().set({
+		'data': req.body,
 		'cookie': req.cookies
 	});
 
