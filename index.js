@@ -378,10 +378,8 @@ function validSiteLoginCookie(cookie) {
 					return Promise.reject("Old cookie.");
 				}
 
-				console.log("Looking for: " + cookie.id);
 				let has = false;
 				Object.keys(snap.val().id).forEach(key => {
-					console.log("Has: " + snap.val().id[key]);
 					if(snap.val().id[key] === cookie.id) {
 						has = true;
 					}
@@ -534,6 +532,81 @@ app.get('/api/site/read', (req, res) => {
 		console.log("Error:", err);
 	});
 });
+
+app.post('/api/site/read', (req, res) => {
+	console.log("\nSite read request.");
+	console.log("Body: ", req.body);
+
+	if(req.body.name === undefined) {
+		res.json({"Error": "No name or value sent",
+				"example": {
+					"name": "nameOfAttribute",
+				}});
+			console.log("Bad request.");
+	}
+
+	let name = req.body.name;
+
+	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
+	.then(val => {
+		database.ref(req.cookies[cookieSiteLoginStr].site + '/' + name).once('value')
+		.then(snap => {
+			res.json(snap.val());
+			console.log("Send data: ", snap.val());
+		})
+		.catch(err => {
+			res.json({"Error": err});
+			console.log("Error: ", err);
+		})
+	})
+	.catch(err => {
+		res.json({"Error": err.toString()});
+		console.log("Error: ", err);
+	})
+});
+
+app.post('/api/site/store', (req, res) => {
+	console.log("\nSite store request.");
+	console.log("Body: ", req.body);
+
+	if(req.body.name === undefined || req.body.value === undefined) {
+		res.json({"Error": "No name or value sent",
+				"example": {
+					"name": "name",
+					"value": "value"
+				},
+				"example2": {
+					"name": "name",
+					"value": {
+						"some": "json"
+					}
+				}});
+			console.log("Bad request.");
+	}
+
+	let name = req.body.name;
+	let value;
+	try {
+		value = JSON.parse(req.body.value);
+	} catch (e) {
+		value = req.body.value;
+	}
+
+	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
+	.then(val => {
+		database.ref(req.cookies[cookieSiteLoginStr].site + '/' + name).set(value)
+
+		try {
+			res.json({"Success": JSON.stringify(value) + " written to " + name + "."});
+		} catch (e) {
+			res.json({"Success": value.toString() + " written to " + name + "."})
+		}
+	})
+	.catch(err => {
+		res.json({"Error": err.toString()});
+		console.log("Error: ", err);
+	})
+})
 
 app.get('/api/site/login/clear', (req, res) => {
 	console.log("\nClear logins request.");

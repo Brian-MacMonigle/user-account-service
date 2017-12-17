@@ -48,6 +48,21 @@
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
+		<form action="/api/site/store" method="post">
+			<fieldset>
+				<legend>Store some data</legend>
+				<label>Data name <input type="text" name="name" value="Name"/></label>
+				<label>Data value: <input type="text" name="value" value="Value"/></label>
+				<input type="submit" value="Submit" />
+			</fieldset>
+		</form>
+		<form action="/api/site/read" method="post">
+			<fieldset>
+				<legend>Read some data</legend>
+				<label>Data name <input type="text" name="name" value="Name"/></label>
+				<input type="submit" value="Submit" />
+			</fieldset>
+		</form>
 
 		<a href="/api/site/read">See Site Data</a>
 		<a href="/api/site/login/clear">Clear Site logins</a>
