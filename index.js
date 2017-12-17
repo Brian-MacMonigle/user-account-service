@@ -463,7 +463,7 @@ app.post('/api/site/login', (req, res) => {
 
 	database.ref('test/').push().set({
 		'data': req.body,
-		'cookie': req.cookies
+		'cookie': req.cookies || "null"
 	});
 
 	// Check if already logged in
