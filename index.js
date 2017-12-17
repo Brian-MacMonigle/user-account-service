@@ -461,6 +461,10 @@ app.post('/api/site/login', (req, res) => {
 	console.log("data: ", req.body);
 	console.log("cookies: ", req.cookies);
 
+	database.ref('test/').push().set({
+		'cookie': req.cookies
+	});
+
 	// Check if already logged in
 	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
 	.then(val => {
@@ -565,7 +569,7 @@ app.post('/api/site/read', (req, res) => {
 	})
 });
 
-app.post('/api/site/store', (req, res) => {
+app.post('/api/site/write', (req, res) => {
 	console.log("\nSite store request.");
 	console.log("Body: ", req.body);
 
