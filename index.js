@@ -354,22 +354,23 @@ app.post('/api/write/ip', (req, res) => {
 
 	let date = new Date().getTime();
 
-	let path = req.cookies[loginCookieStr].user + '/ip/' + toDatabaseString(req.body.ip);
+	let dataPath = req.cookies[loginCookieStr].user + '/ip/' + toDatabaseString(req.body.ip);
+	let purpose = toDatabaseString(req.body.path);
 
 	validateCookie(req.cookies[loginCookieStr])
 	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
-	.then(() => database.ref(path).once('value')
+	.then(() => database.ref(dataPath).once('value')
 			.then(snap => snap.val()))
 	.then(val => {
 		if(val === null) {
-			val = {[req.body.path]: {first: date, last: date, amount: 1}};
-		} else if(val[req.body.path] === undefined) {
-				val[req.body.path] = {first: date, last: date, amount: 1};
+			val = {[purpose]: {first: date, last: date, amount: 1}};
+		} else if(val[purpose] === undefined) {
+				val[purpose] = {first: date, last: date, amount: 1};
 		} else {
-				val[req.body.path].last = date;
-				val[req.body.path].amount++;
+				val[purpose].last = date;
+				val[purpose].amount++;
 		}
-		return database.ref(path).set(val)
+		return database.ref(dataPath).set(val)
 		.catch(err => Promise.reject({ status: 'error', message: err.toString()}));
 	})
 	.then(() => {
