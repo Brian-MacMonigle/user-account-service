@@ -171,7 +171,6 @@ app.post('/api/create', (req, res) => {
 		return;
 	}
 
-
 	database.ref('user/' + user).once('value')
 	.then(snap => snap.val())
 	.then(val => {
@@ -188,7 +187,7 @@ app.post('/api/create', (req, res) => {
 				return Promise.reject({ status: 'error', message: "Error accessing database: " + err.toString() })
 			});
 	})
-	.then(r => createLoginCookie(res, loginCookieStr, user))
+	.then(() => createLoginCookie(res, loginCookieStr, user))
 	.then(r => {
 		console.log("Success: User " + user + " created and logged in.");
 		return res.json({ status: 'success', message: 'User created and logged in.'});
@@ -212,7 +211,7 @@ app.post('/api/login', (req, res) => {
 	.catch(err => {
 		if(req.body.user === undefined || req.body.pass === undefined) {
 			console.log("Bad request.");
-			res.json({status: 'error', message: 'Bad request', example: {user: 'Brian', pass: 'pass'}});
+			res.json({status: 'error', message: 'Bad request.', example: {user: 'Brian', pass: 'pass'}});
 			return;
 		}
 		if(!validDatabaseString(user)) {
@@ -225,57 +224,95 @@ app.post('/api/login', (req, res) => {
 			.then(snap => snap.val())
 			.catch(err => {
 				console.log("Error accessing database: ", err)
-				return Promise.reject({ status: 'error', message: 'Error accessing database: ' + err.toString() })
+				return Promise.reject({ tatus: 'error', message: 'Error accessing database: ' + err.toString()})
 			})
 			.then(val => {
 				if(val === null) {
 					console.log("Invalid username.");
-					return Promise.reject({ status: 'error', message: 'Invalid username or password.'})
+					return Promise.reject({status: 'error', message: 'Invalid username or password.'})
 				}
 				if(val.hash !== hash(val.salt + pass)) {
 					console.log("Invalid password");
-					return Promise.reject({ status: 'error', message: 'Invalid username or password.'})
+					return Promise.reject({status: 'error', message: 'Invalid username or password.'})
 				}
 
 				return createLoginCookie(res, loginCookieStr, user);
 			})
 			.then(r => {
 				console.log("Success: logged in.");
-				res.json({ status: 'success', message: 'Logged in.'});
+				res.json({status: 'success', message: 'Logged in.'});
 			})
 	})
-	.catch(err => res.json(err.toString()));
+	.catch(err => res.json(err));
 });
 
-function clearLogins(cookie) {
-	console.log("Clearing loggins...");
-	return validateCookie(cookie)
-		.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
-		.then(val => database.ref('user/' + cookie.user + '/id').remove()
-			.then(() => {
-				console.log("Success: Logins cleared.");
-				return {status: 'success', message: 'Logins cleared'}
-			})
-			.catch(err => {
-				console.log("Error: ", err);
-				Promise.reject({ status: 'error', message: 'Error accessing database: ' + err.toString()})
-			})
-		);
-}
+app.post('/api/login/change', (req, res) => {
+	console.log("\nChange password request.");
+	console.log("data: ", req.body);
+
+	let user = req.body.user.toLowerCase();
+	let pass = req.body.pass;
+	let newPass = req.body.newPass;
+
+	if(req.body.user === undefined || req.body.pass === undefined || req.body.newPass === undefined) {
+		console.log("Bad reqest.");
+		res.json({status: 'error', message: 'Bad request.', example: {user: 'Brian', pass: 'pass', newPass: 'newPass'}});
+		return;
+	}
+	if(!validDatabaseString(user)) {
+		console.log("Invalid username: " + user);
+		res.json({status: 'error', message: 'Username can not contain /.$[]'});
+		return;
+	}
+
+	database.ref('user/' + user).once('value')
+		.then(snap => snap.val())
+		.catch(err => {
+			console.log("Error accessing database: ", err);
+			return Promise.reject({status: 'error', message: 'Error accesing database: ' + err.toString()});
+		})
+		.then(val => {
+			if(val === null) {
+				console.log("Invalid username.");
+				return Promise.reject({status: 'error', message: 'Invalid username or password.'});
+			}
+			if(val.hash !== hash(val.salt + pass)) {
+				console.log("Invalid password.");
+				return Promise.reject({status: 'error', message: 'Invalid username or password.'});
+			}
+
+			console.log("Updating user.");
+			let salt = uuid();
+			return database.ref('user/' + user).set({salt: salt, hash: hash(salt + newPass)})
+				.catch(err => {
+					console.log("Error accessing database: ", err);
+					return Promise.reject({ status: 'error', message: "Error accessing database: " + err.toString() })
+				})
+		}).then(() => createLoginCookie(res, loginCookieStr, user))
+		.then(r => {
+			console.log("Success: password changed.");
+			return res.json({status: 'success', message: 'Password changed.'})
+		})
+		.catch(err => res.json(err));
+});
 
 app.get('/api/login/clear', (req, res) => {
-	// only new line because function already creates text we want
-	console.log("\n");
-	clearLogins(req.cookies[loginCookieStr])
-	.then(r => {
-		return createLoginCookie(res, loginCookieStr, req.cookies[loginCookieStr].user);
-	})
-	.then(r => {
-		res.json({ status: 'success', message: 'Logins cleared'});	
-	})
-	.catch(err => {
-		res.json(err)
-	});
+	console.log("\nClear logins request.");
+	validateCookie(req.cookies[loginCookieStr])
+	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
+	.then(val => database.ref('user/' + req.cookies[loginCookieStr].user + '/id').remove()
+		.then(() => {
+			console.log("Success: Logins cleared.");
+			return {status: 'success', message: 'Logins cleared'}
+		})
+		.catch(err => {
+			console.log("Error: ", err);
+			return Promise.reject({ status: 'error', message: 'Error accessing database: ' + err.toString()})
+		})
+	)
+	.then(() => createLoginCookie(res, loginCookieStr, req.cookies[loginCookieStr].user))
+	.then(() => res.json({ status: 'success', message: 'Logins cleared'}))
+	.catch(err => res.json(err));
 });
 
 app.get('/api/read', (req, res) => {	

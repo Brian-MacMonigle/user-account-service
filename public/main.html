@@ -27,18 +27,27 @@
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
+		<form action="/api/login/change" method="post">
+			<fieldset>
+				<legend>Log In</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Old password: <input type="password" name="pass" value="pass"/></label>
+				<label>New password: <input type="password" name="newPass" value="pass"/></label>
+				<input type="submit" value="Change" />
+			</fieldset>
+		</form>
 		<form action="/api/read" method="get">
 			<fieldset>
 				<legend>Read some data</legend>
-				<label>Data path: <input type="text" name="path" value="Name"/></label>
+				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
 				<input type="submit" value="Submit" />
 			</fieldset>
 		</form>
 		<form action="/api/write" method="post">
 			<fieldset>
 				<legend>Store some data</legend>
-				<label>Data path: <input type="text" name="path" value="visitors"/></label>
-				<label>Data value: <input type="text" name="data" value="100"/></label>
+				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
+				<label>Data value: <input type="text" name="data" value="data"/></label>
 				<input type="submit" value="Submit" />
 			</fieldset>
 		</form>
