@@ -5,7 +5,7 @@ const hashAlg = 'sha512';
 const uuid = require('uuid/v4');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-const cookieLoginStr = 'brian-user-account-service-logged-in';
+const loginCookieStr = 'brian-user-account-service-logged-in';
 const cookieSiteLoginStr = 'brian-site-account-service-logged-in';
 
 const firebase = require('firebase');
@@ -22,66 +22,61 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+function validDatabaseString(str) {
+	for(let char of str) {
+		if(char === '/' || char === '.' || char === '$' || char === '#' || char === '[' || char === ']') {
+			return false;
+		}
+	}
+	return true;
+}
 
-function siteToDatabase(site) {
+function validDatabasePath(str) {
+	for(let char of str) {
+		if(char === '.' || char === '$' || char === '#' || char === '[' || char === ']') {
+			return false;
+		}
+	}
+	return true;
+}
+
+function toDatabaseString(str) {
 	let res = "";
-	for(let char of site) {
-		if(char === '.' || char === '/') {
-			res += '-';
-		} else {
-			res += char;
+	for(let char of str) {
+		switch(char) {
+			case '/':
+				res += '-';
+				break;
+			case '.':
+				res += ',';
+				break;
+			default:
+				res += char;
 		}
 	}
 	return res;
 }
 
 function saveIp(req, res, next) {
-	let ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-	let date = new Date().toString();
-	let purpose = siteToDatabase(req.url);
-	database.ref('ip/').once('value')
-	.then(snap => snap.val())
-	.then(val => { 
-		let key = undefined;
-		if(val != null) {
-			Object.keys(val).forEach(k => {
-				if(val[k].ip === ip) {
-					key = k;
-				}
-			});
-		}
-		if(val === null || key === undefined) {
-			let json = {
-				'ip': ip
-			}
-			json[purpose] = {
-				'first': date,
-				'last': date,
-				'amount': 1
-			}
-			database.ref('ip/').push().set(json);
-		} else {
-			let json = val[key] || {'ip': ip};
+	let ip = toDatabaseString(req.headers['x-forwarded-for'] || req.connection.remoteAddress);
+	let date = new Date().getTime();
+	let purpose = toDatabaseString(req.path);
 
-			if(json[purpose] === undefined) {
-				json[purpose] = {
-					'first': date,
-					'last': date,
-					'amount': 1
-				}
-			} else {
-				json[purpose] = {
-					'first': json[purpose].first || date,
-					'last': date,
-					'amount': ++json[purpose].amount || 1
-				}
-			}
-			database.ref('ip/' + key).set(json);
+	database.ref('ip/' + ip).once('value')
+	.then(snap => snap.val())
+	.then(val => {
+		if(val === null) {
+			val = {[purpose]: {first: date, last: date, amount: 1}};
+		} else if(val[purpose] === undefined) {
+			val[purpose] = {first: date, last: date, amount: 1};
+		} else {
+			val[purpose].last = date;
+			val[purpose].amount++;
 		}
+		return database.ref('ip/' + ip).set(val)
+			.catch(err => Promise.reject(err.toString()));
 	})
-	.catch(err => {
-		console.log("Error: " + err);
-	});
+	.catch(err => console.log("Error saving ip: ", err))
 	next();
 }
 
@@ -91,551 +86,298 @@ function hash(str) {
 	return crypto.createHash(hashAlg).update(str).digest('hex');
 }
 
+function addLoginCookie(res, cookie, user, id) {
+	console.log("Adding cookie...");
+	return database.ref('user/' + user + '/id').push().set(id)
+	.then(r => {
+		res.cookie(cookie, { user: user, id: id	});
+		console.log("Cookie set.");
+		return {status: 'success', data: { 'cookie': { user: user, id: id} }};
+	})
+	.catch(e => {
+		console.log("Error: Cant set id for cookie in database: ", e);
+		return Promise.reject({status: 'error', message: e.toString()});
+	})
+}
+
+function createLoginCookie(res, cookie, user) {
+	return addLoginCookie(res, cookie, user, uuid());
+}
+
+function validateCookie(cookie) {
+	console.log("Validating cookie...");
+	if(cookie === undefined) {
+		console.log("No cookie to validate.");
+		return Promise.reject({status: 'error', message: 'No cookie to validate.'});
+	}
+	if(cookie.user === undefined) {
+		console.log("Bad cookie.");
+		return Promise.reject({status: 'error', message: 'A user is required in cookie.user.'});
+	}
+	if(cookie.id === undefined) {
+		console.log("Bad cookie.");
+		return Promise.reject({status: 'error', message: 'A id is required in cookie.id'})
+	}
+	return database.ref('user/' + cookie.user + '/id').once('value')
+		.then(snap => snap.val())
+		.catch(err => {
+			console.log("Error: ", err);
+			return Promise.reject({status: 'error', message: err});
+		})
+		.then(ids => {
+			if(ids === null) {
+				console.log("Error: Invalid cookie: Id not in database.");
+				return Promise.reject({status: 'error', message: 'Invalid cookie.'});
+			}
+
+			for(let key in ids) {
+				if(ids[key] === cookie.id) {
+					console.log("Success: valid cookie.");
+					return {status: 'success', data: null};
+				}
+			}
+			console.log("Error: Invalid cookie: Id not in database.");
+			return Promise.reject({status: 'error', message: 'Invalid cookie.'});
+		});
+}
 
 app.get('/api/cookie', (req, res) => {
 	res.json(req.cookies);
 });
 
 app.get('/api/cookie/clear', (req, res) => {
-	Object.keys(req.cookies).forEach(cookie => {
-		res.clearCookie(cookie);
-	})
-	res.json({"Cookies removed": req.cookies});
-});
-
-app.get('/api/user/clear/all', (req, res) => {
-	console.log("\nDelete all users requested.");
-	database.ref('user').remove()
-	.then(r => {
-		res.json({"Success": "Deleted all users."})
-		console.log("Removed all users.");
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error: can't delete all users: ", err);
-	});
-});
-
-app.get('/api/site/clear/all', (req, res) => {
-	console.log("\nDelete all users requested.");
-	database.ref('site').remove()
-	.then(r => {
-		res.json({"Success": "Deleted all Sites."})
-		console.log("Removed all Sites.");
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error: can't delete all sites: ", err);
-	});
-});
-
-function createLoginCookie(res, user) {
-	let id = uuid();
-
-	return database.ref('user/' + user + '/id').push().set(id)
-	.then(r => {
-		res.cookie(cookieLoginStr, {
-			'user': user,
-			'id': id
-		});	
-		return true;
-	}).catch(e => {
-		console.log("Error: Cant set id for cookie in database: ", e);
-		return false;
-	});
-}
-
-// Returns a promise with the value of the data or null if invalid cookie
-function validLoginCookie(cookie) {
-	console.log("Validating cookie...");
-	if(cookie === undefined) {
-		console.log("No cookie to validate.");
-		return Promise.reject("No cookie to validate.");
+	for(var key in req.cookies) {
+		res.clearCookie(key);
 	}
-	if(cookie.user === undefined || cookie.id === undefined) {
-		console.log("Bad cookie.");
-		return Promise.reject("Bad cookie.");
-	}
-	return database.ref('user/' + cookie.user).once('value')
-		.then(snap => {
-			if(snap.val() == null) {
-				console.log("User doesn't exist.");
-				return Promise.reject("User doesn't exist.");
-			} else {
-				if(snap.val().id === undefined) {
-					return Promise.reject("Old cookie.");
-				}
-
-				let has = false;
-				Object.keys(snap.val().id).forEach(key => {
-					if(snap.val().id[key] === cookie.id) {
-						has = true;
-					}
-				});
-				if(!has) {
-					console.log("Old cookie.");
-					return Promise.reject("Old cookie.");
-				}
-
-				console.log("Valid cookie.");
-				return snap.val();
-			}
-		});
-}
+	res.json({status: 'success', data: {'cookies-removed': req.cookies}});
+});
 
 // create a username
 app.post('/api/create', (req, res) => {
 	console.log("\nCreate account request.");
 	console.log("data: ", req.body);
 
-	if(req.body.user === undefined || req.body.pass === undefined) {
-		res.json({"Error": "No username or password sent",
-			"example": {
-				"user": "Brian",
-				"pass": "1234"
-			}});
-		console.log("Bad request.");
-		return;
-	}
-
 	let user = req.body.user.toLowerCase();
 	let pass = req.body.pass;
 
+	if(req.body.user === undefined || req.body.pass === undefined) {
+		console.log("Bad request.");
+		res.json({status: 'error', message: 'Bad request', example: {user: 'Brian', pass: 'pass'}});
+		return;
+	}
+	if(!validDatabaseString(user)) {
+		console.log("Invalid username: " + user);
+		res.json({status: 'error', message: 'Username can not contain /.$#[]'});
+		return;
+	}
+
+
 	database.ref('user/' + user).once('value')
-	.then(snap => {
-		// If we already have data for username.
-		if(snap.val() !== null) {
-			res.json({"Error": "Username is already in use."});
-			console.log("Username already exists");
-			return;
+	.then(snap => snap.val())
+	.then(val => {
+		// User already exists
+		if(val !== null) {
+			console.log("Error: Username " + user + " already exists.");
+			return Promise.reject({status: 'error', message: 'Username already exists.'});
 		}
 
 		let salt = uuid();
-		let id = uuid();
-
-		Promise.all([database.ref('user/' + user).set({
-			'salt': salt,
-			'hash': hash(salt + pass),
-			'id': {}
-		}), createLoginCookie(res, user)])
-		.then(arr => {
-			if(arr[1] === false) {
-				res.json({
-					"Success": "Account created.",
-					"Error": "Could not set cookie."
-				});
-				console.log("Success: Account created.\nError: Could not set cookie.");
-				return;
-			}
-
-			res.json({"Success": "Account " + user + " created"});
-			console.log("Success");
-			return;
-		})
-		.catch(err => {
-			res.json({"Error": "Can't create account."});
-			console.log("Error: can't create account: ", err);
-			return;
-		});
+		return database.ref('user/' + user).set({ salt: salt, hash: hash(salt + pass) })
+			.catch(err => {
+				console.log("Error accessing database: ", err);
+				return Promise.reject({ status: 'error', message: "Error accessing database: " + err.toString() })
+			});
 	})
-	.catch(err => {
-		res.json({"Error": err.toString()})
-		console.log("Error: ", err);
-		return;
-	});
+	.then(r => createLoginCookie(res, loginCookieStr, user))
+	.then(r => {
+		console.log("Success: User " + user + " created and logged in.");
+		return res.json({ status: 'success', message: 'User created and logged in.'});
+	})
+	.catch(err => res.json(err));
 });
 
 app.post('/api/login', (req, res) => {
 	console.log("\nLogin request.");
 	console.log("data: ", req.body);
-	console.log("cookies: ", req.cookies);
+
+	let user = req.body.user.toLowerCase();
+	let pass = req.body.pass;
 
 	// Check if already logged in
-	validLoginCookie(req.cookies[cookieLoginStr])
+	validateCookie(req.cookies[loginCookieStr])
 	.then(val => {
-		res.json({"Error": req.cookies[cookieLoginStr].user + " is already logged in."});
-		console.log("Error: " + req.cookies[cookieLoginStr].user + " is already logged in.");
-		return;
+		console.log("Success: already logged in.");
+		res.json({ status: 'success', message: 'You are already logged in.'});
 	})
 	.catch(err => {
 		if(req.body.user === undefined || req.body.pass === undefined) {
-			res.json({"Error": "No username or password sent",
-				"example": {
-					"user": "Brian",
-					"pass": "1234"
-				}});
 			console.log("Bad request.");
+			res.json({status: 'error', message: 'Bad request', example: {user: 'Brian', pass: 'pass'}});
+			return;
+		}
+		if(!validDatabaseString(user)) {
+			console.log("Invalid username: " + user);
+			res.json({status: 'error', message: 'Username can not contain /.$#[]'});
 			return;
 		}
 
-		let user = req.body.user.toLowerCase();
-		let pass = req.body.pass;
-
-		database.ref('user/' + user).once('value')
-		.then(snap => {
-			// Does user exist
-			if(snap.val() === null) {
-				res.json({"Error": "Invalid username or password."});
-				console.log("Error: Invalid username.");
-				return;
-			}
-
-			// check password
-			if(snap.val().hash !== hash(snap.val().salt + pass)) {
-				res.json({"Error": "Invalid username or password."});
-				console.log("Error: Invalid password.");
-				return;
-			}
-
-			createLoginCookie(res, user)
-			.then(r => {
-				if(r === false) {
-					res.json({"Error": "Could not create cookie."});
-					console.log("Error: Could not create cookie.");
-					return;
+		return database.ref('user/' + user).once('value')
+			.then(snap => snap.val())
+			.catch(err => {
+				console.log("Error accessing database: ", err)
+				return Promise.reject({ status: 'error', message: 'Error accessing database: ' + err.toString() })
+			})
+			.then(val => {
+				if(val === null) {
+					console.log("Invalid username.");
+					return Promise.reject({ status: 'error', message: 'Invalid username or password.'})
+				}
+				if(val.hash !== hash(val.salt + pass)) {
+					console.log("Invalid password");
+					return Promise.reject({ status: 'error', message: 'Invalid username or password.'})
 				}
 
-				res.json({"Success": "Logged in"})
-				console.log("Success: Logged in");
-				return;
-			});
-		})
-		.catch(err => {
-			res.json({"Error": err.toString()});
-			console.log("Error: ", err);
-			return;
-		});
-	});
+				return createLoginCookie(res, loginCookieStr, user);
+			})
+			.then(r => {
+				console.log("Success: logged in.");
+				res.json({ status: 'success', message: 'Logged in.'});
+			})
+	})
+	.catch(err => res.json(err.toString()));
 });
 
-app.get('/api/read', (req, res) => {
-	console.log("\nUser read request.");
-	
-	validLoginCookie(req.cookies[cookieLoginStr])
-	.then(val => {
-		res.json(val);
-		console.log("Res: ", val);
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error:", err);
-	});
-});
+function clearLogins(cookie) {
+	console.log("Clearing loggins...");
+	return validateCookie(cookie)
+		.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
+		.then(val => database.ref('user/' + cookie.user + '/id').remove()
+			.then(() => {
+				console.log("Success: Logins cleared.");
+				return {status: 'success', message: 'Logins cleared'}
+			})
+			.catch(err => {
+				console.log("Error: ", err);
+				Promise.reject({ status: 'error', message: 'Error accessing database: ' + err.toString()})
+			})
+		);
+}
 
 app.get('/api/login/clear', (req, res) => {
-	console.log("\nClear logins request.");
-	
-	validLoginCookie(req.cookies[cookieLoginStr])
-	.then(val => {
-		database.ref('user/' + req.cookies[cookieLoginStr].user + '/id').remove()
-		.catch(e => {
-			res.json({"Error": e.toString()});
-			console.log("Error: ", e);
-			return;
-		});
-		res.json({"Success": "Cleared loggins"});	
-		console.log("Success: Cleared loggins");
-	})
-	.catch(e => {
-		res.json({"Error": e.toString()});
-		console.log("Error:", e);
-	});
-});
-
-function createSiteLoginCookie(res, site) {
-	let id = uuid();
-	return addSiteLoginCookie(res, site, id);
-}
-
-function addSiteLoginCookie(res, site, id) {
-	return database.ref('site/' + site + '/id').push().set(id)
+	// only new line because function already creates text we want
+	console.log("\n");
+	clearLogins(req.cookies[loginCookieStr])
 	.then(r => {
-		res.cookie(cookieSiteLoginStr, {
-			'site': site,
-			'id': id
-		});
-		return true;
-	}).catch(e => {
-		console.log("Error: Cant set id for cookie in database: ", e);
-		return false;
+		return createLoginCookie(res, loginCookieStr, req.cookies[loginCookieStr].user);
+	})
+	.then(r => {
+		res.json({ status: 'success', message: 'Logins cleared'});	
+	})
+	.catch(err => {
+		res.json(err)
 	});
-}
+});
 
-function validSiteLoginCookie(cookie) {
-	console.log("Validating Site cookie...");
-	if(cookie === undefined) {
-		console.log("No cookie to validate.");
-		return Promise.reject("Cookie doesn't exist");
+app.get('/api/read', (req, res) => {	
+	console.log("\nUser read request.");
+	console.log("data: { path: '" + req.query.path + "' }");
+
+	if(req.query.path === undefined) {
+		console.log("Bad request");
+		res.json({ status: 'error', message: 'Invalid query', example: '/api/read?path=data/insideData'})
+		return;
 	}
-	if(cookie.site === undefined || cookie.id === undefined) {
-		console.log("Bad cookie.");
-		return Promise.reject("Bad cookie.");
+
+	if(!validDatabasePath(req.query.path)) {
+		console.log("Bad request");
+		res.json({ status: 'error', message: 'Name may not contain .$#[]'});
 	}
-	return database.ref('site/' + cookie.site).once('value')
-		.then(snap => {
-			if(snap.val() === null) {
-				console.log("Site doesn't exist.");
-				return Promise.reject("Site doesn't exist.");
-			} else {
-				if(snap.val().id === undefined) {
-					return Promise.reject("Old cookie.");
-				}
 
-				let has = false;
-				Object.keys(snap.val().id).forEach(key => {
-					if(snap.val().id[key] === cookie.id) {
-						has = true;
-					}
-				});
-				if(!has) {
-					console.log("Old cookie.");
-					return Promise.reject("Old cookie.");
-				}
+	validateCookie(req.cookies[loginCookieStr])
+	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
+	.then(val => {
+		return database.ref(req.cookies[loginCookieStr].user + '/' + req.query.path).once('value')
+		.then(snap => snap.val())
+		.then(val => {
+			console.log("Success: sent:", val);
+			res.json({ status: 'success', message: val, path: req.query.path});
+		})
+		.catch(err => {
+			console.log("Error accessing database: ", err);
+			return Promise.reject({ status: 'error', message: err.toString()});
+		})
+	})
+	.catch(err => res.json(err));
+});
 
-				console.log("Valid cookie.");
-				return snap.val();
-			}
-		});
-}
-
-app.post('/api/site/create', (req, res) => {
-	console.log("\nCreate Site account request.");
+app.post('/api/write', (req, res) => {
+	console.log("\nUser write request.");
 	console.log("data: ", req.body);
 
-	if(req.body.site === undefined || req.body.pass === undefined) {
-		res.json({"Error": "No site or password sent",
-			"example": {
-				"site": "some.site.com",
-				"pass": "1234"
-			}});
+	if(req.body.path === undefined || req.body.data === undefined) {
 		console.log("Bad request.");
+		res.json({ status: 'error', message: 'Bad request.', example: { path: 'dataName', data: 'coolData'}});
 		return;
 	}
 
-	let site = siteToDatabase(req.body.site.toLowerCase());
-	let pass = req.body.pass;
-
-	database.ref('site/' + site).once('value')
-	.then(snap => {
-		// If we already have data for username.
-		if(snap.val() !== null) {
-			res.json({"Error": "Site is already in use."});
-			console.log("Site already exists.");
-			return;
-		}
-
-		let salt = uuid();
-		let id = uuid();
-
-		Promise.all([database.ref('site/' + site).set({
-			'salt': salt,
-			'hash': hash(salt + pass),
-			'id': {}
-		}), createSiteLoginCookie(res, site)])
-		.then(arr => {
-			if(arr[1] === false) {
-				res.json({
-					"Success": "Site account created.",
-					"Error": "Could not set cookie."
-				});
-				console.log("Success: Account created.\nError: Could not set cookie.");
-				return;
-			}
-
-			res.json({"Success": "Site " + site + " created."});
-			console.log("Success: Site " + site + " created.");
-			return;
-		})
-		.catch(err => {
-			res.json({"Error": "Can't create account."});
-			console.log("Error: can't create account: ", err);
-			return;
-		});
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()})
-		console.log("Error: ", err);
+	if(!validDatabasePath(req.body.path)) {
+		console.log("Bad request");
+		res.json({ status: 'error', message: 'Name may not contain .$#[]'});
 		return;
-	});
-});
+	}
 
-app.post('/api/site/login', (req, res) => {
-	console.log("\nSite Login request.");
-	console.log("data: ", req.body);
-	console.log("cookies: ", req.cookies);
-
-	// Check if already logged in
-	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
+	validateCookie(req.cookies[loginCookieStr])
+	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
 	.then(val => {
-		res.json({"Error": req.cookies[cookieSiteLoginStr].site + " is already logged in."});
-		console.log("Error: " + req.cookies[cookieSiteLoginStr].site + " is already logged in.");
-		return;
-	})
-	.catch(err => {
-		if(req.body.site === undefined || req.body.pass === undefined) {
-			res.json({"Error": "No site or password sent",
-				"example": {
-					"site": "some.site.com",
-					"pass": "1234"
-				}});
-			console.log("Bad request.");
-			return;
-		}
-
-		let site = siteToDatabase(req.body.site.toLowerCase());
-		let pass = req.body.pass;
-
-		database.ref('site/' + site).once('value')
-		.then(snap => {
-			// Does site exist
-			if(snap.val() === null) {
-				res.json({"Error": "Invalid site or password."});
-				console.log("Error: Invalid site.");
-				return;
-			}
-
-			// check password
-			if(snap.val().hash !== hash(snap.val().salt + pass)) {
-				res.json({"Error": "Invalid site or password."});
-				console.log("Error: Invalid password.");
-				return;
-			}
-
-			createSiteLoginCookie(res, site)
-			.then(r => {
-				if(r === false) {
-					res.json({"Error": "Could not create cookie."});
-					console.log("Error: Could not create cookie.");
-					return;
-				}
-
-				res.json({"Success": "Logged in."})
-				console.log("Success: Logged in.");
-				return;
-			});
+		return database.ref(req.cookies[loginCookieStr].user + '/' + req.body.path).set(req.body.data)
+		.then(() => {
+			console.log("Success: " + req.body.path + " = " + req.body.data + ".");
+			res.json({ status: 'success', message: req.body.path + " = " + req.body.data + "."});
 		})
 		.catch(err => {
-			res.json({"Error": err.toString()});
-			console.log("Error: ", err);
-			return;
-		});
-	});
-});
-
-app.get('/api/site/read', (req, res) => {
-	console.log("\nSite read request.");
-	
-	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
-	.then(val => {
-		res.json(val);
-		console.log("Res: ", val);
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error:", err);
-	});
-});
-
-app.post('/api/site/read', (req, res) => {
-	console.log("\nSite read request.");
-	console.log("Body: ", req.body);
-
-	if(req.body.name === undefined) {
-		res.json({"Error": "No name or value sent",
-				"example": {
-					"name": "nameOfAttribute",
-				}});
-			console.log("Bad request.");
-	}
-
-	let name = req.body.name;
-
-	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
-	.then(val => {
-		database.ref(req.cookies[cookieSiteLoginStr].site + '/' + name).once('value')
-		.then(snap => {
-			res.json(snap.val());
-			console.log("Send data: ", snap.val());
-		})
-		.catch(err => {
-			res.json({"Error": err});
-			console.log("Error: ", err);
+			console.log("Error accessing database: ", err);
+			return Promise.reject({ status: 'error', message: err.toString()});
 		})
 	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error: ", err);
-	})
-});
-
-app.post('/api/site/write', (req, res) => {
-	console.log("\nSite store request.");
-	console.log("Body: ", req.body);
-
-	if(req.body.name === undefined || req.body.value === undefined) {
-		res.json({"Error": "No name or value sent",
-				"example": {
-					"name": "name",
-					"value": "value"
-				},
-				"example2": {
-					"name": "name",
-					"value": {
-						"some": "json"
-					}
-				}});
-			console.log("Bad request.");
-	}
-
-	let name = req.body.name;
-	let value;
-	try {
-		value = JSON.parse(req.body.value);
-	} catch (e) {
-		value = req.body.value;
-	}
-
-	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
-	.then(val => {
-		database.ref(req.cookies[cookieSiteLoginStr].site + '/' + name).set(value)
-
-		try {
-			res.json({"Success": JSON.stringify(value) + " written to " + name + "."});
-		} catch (e) {
-			res.json({"Success": value.toString() + " written to " + name + "."})
-		}
-	})
-	.catch(err => {
-		res.json({"Error": err.toString()});
-		console.log("Error: ", err);
-	})
+	.catch(err => res.json(err));
 })
 
-app.get('/api/site/login/clear', (req, res) => {
-	console.log("\nClear logins request.");
-	
-	validSiteLoginCookie(req.cookies[cookieSiteLoginStr])
-	.then(val => {
+app.post('/api/write/ip', (req, res) => {
+	console.log("\nUser write ip request.");
+	console.log("data: ", req.body);
 
-		// remove current set
-		database.ref('site/' + req.cookies[cookieSiteLoginStr].site + '/id').remove()
-		.catch(e => {
-			res.json({"Error": e.toString()});
-			console.log("Error: ", e);
-			return;
-		})
-		.then(() => {
-			// add this cookie back in
-			return addSiteLoginCookie(res, req.cookies[cookieSiteLoginStr].site, req.cookies[cookieSiteLoginStr].id);
-		});
-		res.json({"Success": "Cleared loggins"});	
-		console.log("Success: Cleared loggins");
+	if(req.body.ip === undefined || req.body.path === undefined) {
+		console.log("Bad request.");
+		res.json({ status: 'error', message: 'Bad request.', example: { ip: 'their ip', path: 'their path'}});
+		return;
+	}
+
+	let date = new Date().getTime();
+
+	let path = req.cookies[loginCookieStr].user + '/ip/' + toDatabaseString(req.body.ip);
+
+	validateCookie(req.cookies[loginCookieStr])
+	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
+	.then(() => database.ref(path).once('value')
+			.then(snap => snap.val()))
+	.then(val => {
+		if(val === null) {
+			val = {[req.body.path]: {first: date, last: date, amount: 1}};
+		} else if(val[req.body.path] === undefined) {
+				val[req.body.path] = {first: date, last: date, amount: 1};
+		} else {
+				val[req.body.path].last = date;
+				val[req.body.path].amount++;
+		}
+		return database.ref(path).set(val)
+		.catch(err => Promise.reject({ status: 'error', message: err.toString()}));
 	})
-	.catch(e => {
-		res.json({"Error": e.toString()});
-		console.log("Error:", e);
-	});
-});
+	.then(() => {
+		console.log("Success: ip saved.");
+		res.json({ status: 'success', message: 'Ip saved.'})
+	})
+	.catch(err => res.json(err));
+})
 
 app.get('/api/uuid', (req, res) => {
 	res.json(uuid());

@@ -27,45 +27,21 @@
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
-
-		<a href="/api/read">See User Data</a>
-		<a href="/api/login/clear">Clear logins</a>
-		<a href="/api/user/clear/all">Delete all user Accounts</a>
-
-		<form action="/api/site/create" method="post">
-			<fieldset>
-				<legend>Website Create</legend>
-				<label>Website URL: <input type="text" name="site" value="some.site.com"/></label>
-				<label>Password: <input type="password" name="pass" value="pass"/></label>
-				<input type="submit" value="Create" />
-			</fieldset>
-		</form>
-		<form action="/api/site/login" method="post">
-			<fieldset>
-				<legend>Website Login</legend>
-				<label>Website URL: <input type="text" name="site" value="some.site.com"/></label>
-				<label>Password: <input type="password" name="pass" value="pass"/></label>
-				<input type="submit" value="Login" />
-			</fieldset>
-		</form>
-		<form action="/api/site/write" method="post">
-			<fieldset>
-				<legend>Store some data</legend>
-				<label>Data name <input type="text" name="name" value="Name"/></label>
-				<label>Data value: <input type="text" name="value" value="Value"/></label>
-				<input type="submit" value="Submit" />
-			</fieldset>
-		</form>
-		<form action="/api/site/read" method="post">
+		<form action="/api/read" method="get">
 			<fieldset>
 				<legend>Read some data</legend>
-				<label>Data name <input type="text" name="name" value="Name"/></label>
+				<label>Data path: <input type="text" name="path" value="Name"/></label>
 				<input type="submit" value="Submit" />
 			</fieldset>
 		</form>
-
-		<a href="/api/site/read">See Site Data</a>
-		<a href="/api/site/login/clear">Clear Site logins</a>
-		<a href="/api/site/clear/all">Delete all Site Accounts</a>
+		<form action="/api/write" method="post">
+			<fieldset>
+				<legend>Store some data</legend>
+				<label>Data path: <input type="text" name="path" value="visitors"/></label>
+				<label>Data value: <input type="text" name="data" value="100"/></label>
+				<input type="submit" value="Submit" />
+			</fieldset>
+		</form>
+		<a href="/api/login/clear">Clear logins</a>
 	</body>
 </html>
