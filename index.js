@@ -421,7 +421,6 @@ app.post('/api/write/ip', (req, res) => {
 
 	let ip = toDatabaseString(req.body.ip);
 	let purpose = toDatabaseString(req.body.path);
-	let valSave;
 
 	validateCookie(req.cookies[loginCookieStr])
 	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
@@ -450,18 +449,18 @@ app.post('/api/write/ip', (req, res) => {
 		else {
 			val.visitors.vistor++;
 		}
-		valSave = val;
 		return database.ref(req.cookies[loginCookieStr].user + '/ip').set(val)
-		.then(() => {
-			console.log("Success: ip saved.");
-			res.json({
-				status: 'success', message: 'Ip saved.', data: {
-					[ip]: {[purpose]: valSave[ip][purpose]}}, 
-					unique: valSaved.visitors.unique, 
-					visitor: valSaved.visitors.visitor
+			.then(() => {
+				console.log("Success: ip saved.");
+				res.json({
+					status: 'success', message: 'Ip saved.', data: {
+						[ip]: {[purpose]: valSave[ip][purpose]}, 
+						unique: valSaved.visitors.unique, 
+						visitor: valSaved.visitors.visitor
+					}
 				});
-		})
-		.catch(err => Promise.reject({ status: 'error', message: err.toString()}))
+			})
+			.catch(err => Promise.reject({ status: 'error', message: err.toString()}))
 	})
 	.catch(err => res.json(err));
 });
