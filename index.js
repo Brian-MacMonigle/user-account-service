@@ -391,8 +391,11 @@ app.post('/api/write/ip', (req, res) => {
 
 	let date = new Date().getTime();
 
-	let dataPath = req.cookies[loginCookieStr].user + '/ip/' + toDatabaseString(req.body.ip);
+	let ip = toDatabaseString(req.body.ip);
+	let dataPath = req.cookies[loginCookieStr].user + '/ip/' + ip;
 	let purpose = toDatabaseString(req.body.path);
+
+	let valSave;
 
 	validateCookie(req.cookies[loginCookieStr])
 	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
@@ -407,12 +410,13 @@ app.post('/api/write/ip', (req, res) => {
 				val[purpose].last = date;
 				val[purpose].amount++;
 		}
+		valSave = val;
 		return database.ref(dataPath).set(val)
 		.catch(err => Promise.reject({ status: 'error', message: err.toString()}));
 	})
 	.then(() => {
 		console.log("Success: ip saved.");
-		res.json({ status: 'success', message: 'Ip saved.'})
+		res.json({ status: 'success', message: 'Ip saved.' data: {[ip]: {[purpose]: valSave[purpose]}}})
 	})
 	.catch(err => res.json(err));
 })
