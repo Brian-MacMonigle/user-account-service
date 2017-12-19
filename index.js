@@ -416,7 +416,7 @@ app.post('/api/write/ip', (req, res) => {
 	})
 	.then(() => {
 		console.log("Success: ip saved.");
-		res.json({ status: 'success', message: 'Ip saved.' data: {[ip]: {[purpose]: valSave[purpose]}}})
+		res.json({ status: 'success', message: 'Ip saved.', data: {[ip]: {[purpose]: valSave[purpose]}}})
 	})
 	.catch(err => res.json(err));
 })
