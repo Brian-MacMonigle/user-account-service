@@ -434,7 +434,7 @@ app.post('/api/write/ip', (req, res) => {
 		if(val[ip] === undefined) {
 			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
 			if(val.visitors === undefined) {
-				val.vistors = {unique: 1, visitor: 0};
+				val.visitors = {unique: 1, visitor: 0};
 			} else {
 				val.visitors.unique++;
 			}
