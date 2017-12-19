@@ -62,18 +62,29 @@ function saveIp(req, res, next) {
 	let date = new Date().getTime();
 	let purpose = toDatabaseString(req.path);
 
-	database.ref('ip/' + ip).once('value')
+	database.ref('ip/').once('value')
 	.then(snap => snap.val())
 	.then(val => {
 		if(val === null) {
-			val = {[purpose]: {first: date, last: date, amount: 1}};
-		} else if(val[purpose] === undefined) {
-			val[purpose] = {first: date, last: date, amount: 1};
-		} else {
-			val[purpose].last = date;
-			val[purpose].amount++;
+			val = {};
 		}
-		return database.ref('ip/' + ip).set(val)
+		if(val[ip] === undefined) {
+			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
+			if(val.visitors === undefined){
+				val.visitors = {unique: 0, visitor: 0};
+			}
+			val.visitors.unique++;
+		} else if(val[ip][purpose] === undefined) {
+			val[ip][purpose] = {first: date, last: date, amount: 1};
+		} else {
+			val[ip][purpose].last = date;
+			val[ip][purpose].amount++;
+		}
+		if(val.visitors === undefined) {
+			val.visitors = {unique: 1, visitor: 0};
+		}
+		val.visitors.visitor++;
+		return database.ref('ip/').set(val)
 			.catch(err => Promise.reject(err.toString()));
 	})
 	.catch(err => console.log("Error saving ip: ", err))
@@ -379,6 +390,23 @@ app.post('/api/write', (req, res) => {
 	.catch(err => res.json(err));
 })
 
+app.get('/api/read/ip/visitor', (req, res) => {
+	console.log("\nUser ip visitor request.");
+
+	validateCookie(req.cookies[loginCookieStr])
+	.catch(err => Promise.reject({status: 'error', message: 'Not logged in.'}))
+	.then(() => database.ref(req.cookies[loginCookieStr].user + '/ip/visitors')
+		.catch(err => Promise.reject({status: 'error', message: 'Error accessing database.'})))
+	.then(snap => snap.val())
+	.then(val => {
+		if(val.visitors !== undefined && val.visitors.unique !== undefined && val.visitors.unique !== undefined) {
+			return res.json({status: 'success', unique: unique, visitor: vistor});
+		}
+		return Promise.reject({status: 'error', message: 'Database out of sync.'});
+	})
+	.catch(err => res.json(err));
+});
+
 app.post('/api/write/ip', (req, res) => {
 	console.log("\nUser write ip request.");
 	console.log("data: ", req.body);
@@ -392,34 +420,51 @@ app.post('/api/write/ip', (req, res) => {
 	let date = new Date().getTime();
 
 	let ip = toDatabaseString(req.body.ip);
-	let dataPath = req.cookies[loginCookieStr].user + '/ip/' + ip;
 	let purpose = toDatabaseString(req.body.path);
-
 	let valSave;
 
 	validateCookie(req.cookies[loginCookieStr])
 	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
-	.then(() => database.ref(dataPath).once('value')
+	.then(() => database.ref(req.cookies[loginCookieStr].user + '/ip').once('value')
 			.then(snap => snap.val()))
 	.then(val => {
 		if(val === null) {
-			val = {[purpose]: {first: date, last: date, amount: 1}};
+			val = {};
+		}
+		if(val[ip] === undefined) {
+			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
+			if(val.visitors === undefined) {
+				val.vistors = {unique: 1, visitor: 0};
+			} else {
+				val.visitors.unique++;
+			}
 		} else if(val[purpose] === undefined) {
-				val[purpose] = {first: date, last: date, amount: 1};
+			val[ip][purpose] = {first: date, last: date, amount: 1};
 		} else {
-				val[purpose].last = date;
-				val[purpose].amount++;
+			val[ip][purpose].last = date;
+			val[ip][purpose].amount++;
+		}
+		if(val.visitors === undefined) { // they broke somethinng
+			val.visitors = {unique: 1, visitor: 1};
+		}
+		else {
+			val.visitors.vistor++;
 		}
 		valSave = val;
-		return database.ref(dataPath).set(val)
+		return database.ref(req.cookies[loginCookieStr].user + '/ip').set(val)
 		.catch(err => Promise.reject({ status: 'error', message: err.toString()}));
 	})
 	.then(() => {
 		console.log("Success: ip saved.");
-		res.json({ status: 'success', message: 'Ip saved.', data: {[ip]: {[purpose]: valSave[purpose]}}})
+		res.json({
+			status: 'success', message: 'Ip saved.', data: {
+				[ip]: {[purpose]: valSave[ip][purpose]}}, 
+				unique: valSaved.visitors.unique, 
+				visitor: valSaved.visitors.visitor
+			});
 	})
 	.catch(err => res.json(err));
-})
+});
 
 app.get('/api/uuid', (req, res) => {
 	res.json(uuid());
