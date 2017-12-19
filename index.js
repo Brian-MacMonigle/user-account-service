@@ -430,33 +430,33 @@ app.post('/api/write/ip', (req, res) => {
 		if(val === null) {
 			val = {};
 		}
+		if(val.visitors === undefined) {
+			val.visitors = {unique: 0, visitor: 0};
+		}
+		if(val.visitors.unique === undefined) {
+			val.visitors.unique = 0;
+		}
+		if(val.visitors.visitor === undefined) {
+			val.visitors.visitor = 0;
+		}
 		if(val[ip] === undefined) {
 			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
-			if(val.visitors === undefined) {
-				val.visitors = {unique: 1, visitor: 0};
-			} else {
-				val.visitors.unique++;
-			}
+			val.visitors.unique++;
 		} else if(val[purpose] === undefined) {
 			val[ip][purpose] = {first: date, last: date, amount: 1};
 		} else {
 			val[ip][purpose].last = date;
 			val[ip][purpose].amount++;
 		}
-		if(val.visitors === undefined) { // they broke somethinng
-			val.visitors = {unique: 1, visitor: 1};
-		}
-		else {
-			val.visitors.vistor++;
-		}
+		val.visitors.vistor++;
 		return database.ref(req.cookies[loginCookieStr].user + '/ip').set(val)
 			.then(() => {
 				console.log("Success: ip saved.");
 				res.json({
 					status: 'success', message: 'Ip saved.', data: {
 						[ip]: {[purpose]: valSave[ip][purpose]}, 
-						unique: valSaved.visitors.unique, 
-						visitor: valSaved.visitors.visitor
+						unique: val.visitors.unique, 
+						visitor: val.visitors.visitor
 					}
 				});
 			})
