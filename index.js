@@ -57,41 +57,59 @@ function toDatabaseString(str) {
 	return res;
 }
 
-function saveIp(req, res, next) {
-	let ip = toDatabaseString(req.headers['x-forwarded-for'] || req.connection.remoteAddress);
-	let date = new Date().getTime();
-	let purpose = toDatabaseString(req.path);
-
-	database.ref('ip/').once('value')
-	.then(snap => snap.val())
-	.then(val => {
-		if(val === null) {
-			val = {};
-		}
-		if(val[ip] === undefined) {
-			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
-			if(val.visitors === undefined){
-				val.visitors = {unique: 0, visitor: 0};
+function saveIp(ip, purpose, date, data, prefix = "") {
+	return Promise.all([
+		database.ref(prefix + 'ip/' + ip + '/request/' + purpose + '/' + date.getTime()).set(true),
+		database.ref(prefix + 'ip/' + ip + '/purpose/' + purpose).once('value')
+		.then(snap => snap.val())
+		.then(json => {
+			if(json === null) {
+				json = {amount: 1};
+			} else {
+				json.amount++;
 			}
-			val.visitors.unique++;
-		} else if(val[ip][purpose] === undefined) {
-			val[ip][purpose] = {first: date, last: date, amount: 1};
+			database.ref(prefix + 'ip/' + ip + '/purpose/' + purpose).set(json);
+		}),
+		database.ref(prefix + 'ip/request/' + date.getTime()).set(data)
+	]);
+}
+
+function saveIpMiddleware(req, res, next) {
+	let ip = toDatabaseString(req.headers['x-forwarded-for'] || req.connection.remoteAddress);
+	let purpose = toDatabaseString(req.path);
+	let date = new Date();
+	let data = {purpose: purpose, date: date.toString(), body: {}, cookies: {},};
+	for(var key in req.body) {
+		if(key.toLowerCase().indexOf('pass') !== -1) {
+			data.body[key] = '[password]';
 		} else {
-			val[ip][purpose].last = date;
-			val[ip][purpose].amount++;
+			data.body[key] = req.body[key];
 		}
-		if(val.visitors === undefined) {
-			val.visitors = {unique: 1, visitor: 0};
-		}
-		val.visitors.visitor++;
-		return database.ref('ip/').set(val)
-			.catch(err => Promise.reject(err.toString()));
-	})
-	.catch(err => console.log("Error saving ip: ", err))
+	}
+	for(var key in req.cookies) {
+		data.cookies[key] = req.cookies[key];
+	}
+
+	saveIp(ip, purpose, date, data);
+	// database.ref('ip/' + ip + '/request/' + purpose + '/' + date.getTime()).set(true);
+	// database.ref('ip/' + ip + '/purpose').once('value')
+	// .then(snap => snap.val())
+	// .then(json => {
+	// 	if(json === null) {
+	// 		json = {};
+	// 	}
+	// 	if(json[purpose] === undefined) {
+	// 		json[purpose] = {amount: 1};
+	// 	} else {
+	// 		json[purpose].amount++;
+	// 	}
+	// 	database.ref('ip/' + ip + '/purpose').set(json).catch(err => console.log("Error 1:", err));
+	// }).catch(err => console.log("Error 2:", err));
+	// database.ref('ip/request/' + date.getTime()).set(data);
 	next();
 }
 
-app.use(saveIp);
+app.use(saveIpMiddleware);
 
 function hash(str) {
 	return crypto.createHash(hashAlg).update(str).digest('hex');
@@ -210,21 +228,32 @@ app.post('/api/login', (req, res) => {
 	console.log("\nLogin request.");
 	console.log("data: ", req.body);
 
+	if(req.body.user === undefined || req.body.pass === undefined) {
+		console.log("Bad request.");
+		res.json({status: 'error', message: 'Bad request.', example: {user: 'Brian', pass: 'pass'}});
+		return;
+	}
+
 	let user = req.body.user.toLowerCase();
 	let pass = req.body.pass;
 
-	// Check if already logged in
-	validateCookie(req.cookies[loginCookieStr])
-	.then(val => {
+	new Promise((resolve, reject) => {
+		if(req.cookies[loginCookieStr] !== undefined && req.cookies[loginCookieStr].user === user) {
+			validateCookie(req.cookies[loginCookieStr])
+			.then(val => {
+				resolve();
+			})
+			.catch(err => {
+				reject();
+			});
+		} else {
+			reject();
+		}
+	}).then(val => {
 		console.log("Success: already logged in.");
 		res.json({ status: 'success', message: 'You are already logged in.'});
 	})
 	.catch(err => {
-		if(req.body.user === undefined || req.body.pass === undefined) {
-			console.log("Bad request.");
-			res.json({status: 'error', message: 'Bad request.', example: {user: 'Brian', pass: 'pass'}});
-			return;
-		}
 		if(!validDatabaseString(user)) {
 			console.log("Invalid username: " + user);
 			res.json({status: 'error', message: 'Username can not contain /.$#[]'});
@@ -390,79 +419,28 @@ app.post('/api/write', (req, res) => {
 	.catch(err => res.json(err));
 })
 
-app.get('/api/read/ip/visitor', (req, res) => {
-	console.log("\nUser ip visitor request.");
-
-	validateCookie(req.cookies[loginCookieStr])
-	.catch(err => Promise.reject({status: 'error', message: 'Not logged in.'}))
-	.then(() => database.ref(req.cookies[loginCookieStr].user + '/ip/visitors')
-		.catch(err => Promise.reject({status: 'error', message: 'Error accessing database.'})))
-	.then(snap => snap.val())
-	.then(val => {
-		if(val.visitors !== undefined && val.visitors.unique !== undefined && val.visitors.unique !== undefined) {
-			return res.json({status: 'success', unique: unique, visitor: vistor});
-		}
-		return Promise.reject({status: 'error', message: 'Database out of sync.'});
-	})
-	.catch(err => res.json(err));
-});
-
 app.post('/api/write/ip', (req, res) => {
 	console.log("\nUser write ip request.");
 	console.log("data: ", req.body);
 
-	if(req.body.ip === undefined || req.body.path === undefined) {
+	if(req.body.ip === undefined || req.body.purpose === undefined || req.body.data === undefined) {
 		console.log("Bad request.");
-		res.json({ status: 'error', message: 'Bad request.', example: { ip: 'their ip', path: 'their path'}});
+		res.json({status: 'error', message: 'Bad request.', example: { ip: 'their ip', purpose: 'home', data: {the: 'data', you: 'want', to: 'store'}}});
 		return;
 	}
 
-	let date = new Date().getTime();
-
-	let ip = toDatabaseString(req.body.ip);
-	let purpose = toDatabaseString(req.body.path);
-
 	validateCookie(req.cookies[loginCookieStr])
-	.catch(err => Promise.reject({ status: 'error', message: 'Not logged in.'}))
-	.then(() => database.ref(req.cookies[loginCookieStr].user + '/ip').once('value')
-			.then(snap => snap.val()))
+	.catch(err => Promise.reject({status: 'error', message: 'Not logged in.'}))
+	.then(() => saveIp(toDatabaseString(req.body.ip), toDatabaseString(req.body.purpose), new Date(), req.body.data, req.cookies[loginCookieStr].user + '/'))
+		.catch(err => {
+			console.log("Error accessing database.");
+			return Promise.reject({status: 'error', message: 'Error accessing database.'})
+		})
 	.then(val => {
-		if(val === null) {
-			val = {};
-		}
-		if(val.visitors === undefined) {
-			val.visitors = {unique: 0, visitor: 0};
-		}
-		if(val.visitors.unique === undefined) {
-			val.visitors.unique = 0;
-		}
-		if(val.visitors.visitor === undefined) {
-			val.visitors.visitor = 0;
-		}
-		if(val[ip] === undefined) {
-			val[ip] = {[purpose]: {first: date, last: date, amount: 1}};
-			val.visitors.unique++;
-		} else if(val[purpose] === undefined) {
-			val[ip][purpose] = {first: date, last: date, amount: 1};
-		} else {
-			val[ip][purpose].last = date;
-			val[ip][purpose].amount++;
-		}
-		val.visitors.vistor++;
-		return database.ref(req.cookies[loginCookieStr].user + '/ip').set(val)
-			.then(() => {
-				console.log("Success: ip saved.");
-				res.json({
-					status: 'success', message: 'Ip saved.', data: {
-						[ip]: {[purpose]: valSave[ip][purpose]}, 
-						unique: val.visitors.unique, 
-						visitor: val.visitors.visitor
-					}
-				});
-			})
-			.catch(err => Promise.reject({ status: 'error', message: err.toString()}))
+		console.log("Success: Ip saved.");
+		res.json({status: 'success', message: 'Ip saved.'});
 	})
-	.catch(err => res.json(err));
+	.catch(err => res.json(err))
 });
 
 app.get('/api/uuid', (req, res) => {
@@ -472,5 +450,9 @@ app.get('/api/uuid', (req, res) => {
 app.get('/', (req, res) => {
 	res.sendFile(__dirname + "/public/main.html");
 });
+
+app.get('/test', (req, res) => {
+	res.sendFile(__dirname + "/public/test.html");
+})
 
 app.listen(process.env.PORT || 5000);

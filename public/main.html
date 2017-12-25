@@ -1,56 +1,112 @@
 <!DOCTYPE html>
 <html>
+	<head>
+		<title>Brian's User Account Service</title>
+	</head>
 	<body>
 		<h1>
 			Brian's User Account Service
 		</h1>
+		<h2>
+			Why use this website
+		</h2>
 		<p>
-			Instructions to follow later.
+			This website is designed to be a backend for a variety of other websites.
+		</p>
+		<p>
+			This website allows you to:
+		</p>
+		<ul>
+			<li>Create an account</li>
+			<li>Log into said account</li>
+			<li>Store data via that account</li>
+			<li>Retrieve data via that account</li>
+		</ul>
+		<p>
+			The advantages of using this site is:
+		</p>
+		<ul>
+			<li>One database to rule them all</li>
+			<li>Users are shared between your websites</li>
+			<li>All passwords are stored via a salted hash (using sha 512)</li>
+			<li>Comes with a simple metric tracking tool.</li>
+		</ul>
+
+		<br/>
+		<h2>
+			How to test this website
+		</h2>
+		<p>
+			First create an account using the <i>Create Account</i> form.  This will bring you to a webpage display the json response.  Go back to this webpage to continue.<br/>If you are a returning user go to the <i>Log In</i> form and log in.
+		</p>
+		<p>
+			When you are logged in you can click on the <i>See Cookies</i> link to see the cookie stored on your machine.  You can also click on <i>Remove Cookies</i> to remove all cookies set by this website.
+		</p>
+		<p>
+			You can also change your password using the <i>Change Password</i> form.  If you change your password then you must re-login on other computers, it is done automaticly on this computer.
+		</p>
+		<p>
+			<i>Store some data</i> form allows you to save some data linked to your user.  This data will only be viewable by you when you are logged in.  The path determines where the data is stored.  Example: you could store 'Visitors' with a value of 100.  Note: If you overwrite some data there is no way to get that data back.
+		</p>
+		<p>
+			<i>Read some Data</i> form reads the data that you request.  If you used the above exapmle then reading 'Visitors' would return 100.
+		</p>
+		<p>
+			The <i>Clear Logins</i> link logs out all other computers using a cookie to log in.
 		</p>
 
+
 		<a href="/api/cookie">See Cookies</a>
+		<br/>
 		<a href="/api/cookie/clear">Remove All Cookies</a>
+		<br/>
+		<br/>
 
 		<form action="/api/create" method="post">
 			<fieldset>
 				<legend>Create Account</legend>
-				<label>Name: <input type="text" name="user" value="Brian"/></label>
-				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<label>Name: <input type="text" name="user"/></label>
+				<label>Password: <input type="password" name="pass"/></label>
 				<input type="submit" value="Create" />
 			</fieldset>
 		</form>
+		<br/>
 		<form action="/api/login" method="post">
 			<fieldset>
 				<legend>Log In</legend>
-				<label>Name: <input type="text" name="user" value="Brian"/></label>
-				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<label>Name: <input type="text" name="user"/></label>
+				<label>Password: <input type="password" name="pass"/></label>
 				<input type="submit" value="Login" />
 			</fieldset>
 		</form>
+		<br/>
 		<form action="/api/login/change" method="post">
 			<fieldset>
-				<legend>Log In</legend>
-				<label>Name: <input type="text" name="user" value="Brian"/></label>
-				<label>Old password: <input type="password" name="pass" value="pass"/></label>
-				<label>New password: <input type="password" name="newPass" value="pass"/></label>
+				<legend>Change Password</legend>
+				<label>Name: <input type="text" name="user"/></label>
+				<label>Old password: <input type="password"/></label>
+				<label>New password: <input type="password"/></label>
 				<input type="submit" value="Change" />
 			</fieldset>
 		</form>
-		<form action="/api/read" method="get">
-			<fieldset>
-				<legend>Read some data</legend>
-				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
-				<input type="submit" value="Submit" />
-			</fieldset>
-		</form>
+		<br/>
 		<form action="/api/write" method="post">
 			<fieldset>
 				<legend>Store some data</legend>
-				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
-				<label>Data value: <input type="text" name="data" value="data"/></label>
-				<input type="submit" value="Submit" />
+				<label>Data path: <input type="text" name="path"/></label>
+				<label>Data value: <input type="text" name="data"/></label>
+				<input type="submit" value="Save" />
 			</fieldset>
 		</form>
+		<br/>
+		<form action="/api/read" method="get">
+			<fieldset>
+				<legend>Read some data</legend>
+				<label>Data path: <input type="text" name="path"/></label>
+				<input type="submit" value="Read" />
+			</fieldset>
+		</form>
+		<br/>
 		<a href="/api/login/clear">Clear logins</a>
 	</body>
 </html>

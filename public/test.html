@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Brian's Test Page</title>
+	</head>
+	<body>
+		<h1>
+			Brian's User Account Service
+		</h1>
+		<p>
+			Instructions to follow later.
+		</p>
+
+		<a href="/api/cookie">See Cookies</a>
+		<a href="/api/cookie/clear">Remove All Cookies</a>
+
+		<form action="/api/create" method="post">
+			<fieldset>
+				<legend>Create Account</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Create" />
+			</fieldset>
+		</form>
+		<form action="/api/login" method="post">
+			<fieldset>
+				<legend>Log In</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Password: <input type="password" name="pass" value="pass"/></label>
+				<input type="submit" value="Login" />
+			</fieldset>
+		</form>
+		<form action="/api/login/change" method="post">
+			<fieldset>
+				<legend>Change Password</legend>
+				<label>Name: <input type="text" name="user" value="Brian"/></label>
+				<label>Old password: <input type="password" name="pass" value="pass"/></label>
+				<label>New password: <input type="password" name="newPass" value="pass"/></label>
+				<input type="submit" value="Change" />
+			</fieldset>
+		</form>
+		<form action="/api/read" method="get">
+			<fieldset>
+				<legend>Read some data</legend>
+				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
+				<input type="submit" value="Read" />
+			</fieldset>
+		</form>
+		<form action="/api/write" method="post">
+			<fieldset>
+				<legend>Store some data</legend>
+				<label>Data path: <input type="text" name="path" value="some/deep/dish"/></label>
+				<label>Data value: <input type="text" name="data" value="data"/></label>
+				<input type="submit" value="Save" />
+			</fieldset>
+		</form>
+		<form action="/api/write/ip" method="post">
+			<fieldset>
+				<legend>Test write/ip function</legend>
+				<label>Ip: <input type="text" name="ip" value="::1"/></label>
+				<label>Purpose: <input type="text" name="purpose" value ="home"/></label>
+				<label>Data: <input type="text" name="data" value="{json: 'value'}"/></label>
+				<input type="submit" value="Save" />
+			</fieldset>
+		</form>
+		<a href="/api/login/clear">Clear logins</a>
+	</body>
+</html>
